@@ -573,9 +573,14 @@ impl Build {
 
         #[cfg(target_os = "macos")]
         let status = {
-            let mut cmd = Command::new("open");
-            cmd.arg("-a");
-            cmd.arg("Playdate Simulator");
+            let mut cmd = Command::new(
+                playdate_sdk_path()?
+                    .join("bin")
+                    .join("Playdate Simulator.app")
+                    .join("Contents")
+                    .join("MacOS")
+                    .join("Playdate Simulator"),
+            );
             cmd.arg(&pdx_path);
             cmd.status()?
         };
