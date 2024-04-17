@@ -582,6 +582,7 @@ impl Build {
                     .join("Playdate Simulator"),
             );
             cmd.arg(&pdx_path);
+            cmd.env("RUST_BACKTRACE", "1");
             cmd.status()?
         };
 
