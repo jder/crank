@@ -455,6 +455,8 @@ impl Build {
             env::var("USER").expect("user")
         )));
 
+        println!("Mounting Playdate; if it does not reboot into data disk mode try doing that manually in Settings -> System");
+
         let duration = time::Duration::from_millis(100);
         if modem_path.exists() {
             let mut cmd = Command::new(&pdutil_path);
