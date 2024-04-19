@@ -18,7 +18,7 @@ This software is not sponsored or supported by Panic.
 Since crank is not yet on crates.io, one needs to download it with git and install it with cargo.
 
 ```shell
-cargo install --git=https://github.com/pd-rs/crank
+cargo install --git=https://github.com/jder/crank
 ```
 
 After that one should be able to run crank
