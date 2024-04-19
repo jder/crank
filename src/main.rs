@@ -8,7 +8,7 @@ use std::{
     fs::{self},
     io::Write,
     path::{Path, PathBuf},
-    process::{Command, ExitStatus, Stdio},
+    process::{Command, Stdio},
     thread, time,
 };
 use structopt::StructOpt;
@@ -904,15 +904,17 @@ fn main() -> Result<(), Error> {
 
     info!("starting");
 
-    let crank_manifest = load_manifest(&opt.manifest_path)?;
-
-    info!("manifest = {:#?}", crank_manifest);
-
     match &opt.cmd {
         CrankCommand::Build(build) => {
+            let crank_manifest = load_manifest(&opt.manifest_path)?;
+
+            info!("manifest = {:#?}", crank_manifest);
             build.execute(&opt, &crank_manifest)?;
         }
         CrankCommand::Run(build) => {
+            let crank_manifest = load_manifest(&opt.manifest_path)?;
+
+            info!("manifest = {:#?}", crank_manifest);
             let build_and_run = Build {
                 run: true,
                 ..build.clone()
@@ -920,6 +922,9 @@ fn main() -> Result<(), Error> {
             build_and_run.execute(&opt, &crank_manifest)?;
         }
         CrankCommand::Package(package) => {
+            let crank_manifest = load_manifest(&opt.manifest_path)?;
+
+            info!("manifest = {:#?}", crank_manifest);
             package.execute(&opt, &crank_manifest)?;
         }
     }
