@@ -605,11 +605,7 @@ impl Build {
         Ok(())
     }
 
-    pub fn execute(
-        &self,
-        opt: &Opt,
-        crank_manifest: &Manifest,
-    ) -> Result<(PathBuf, String), Error> {
+    pub fn execute(&self, opt: &Opt) -> Result<(PathBuf, String), Error> {
         info!("building");
 
         let current_dir = std::env::current_dir()?;
@@ -686,6 +682,10 @@ impl Build {
         if !status.success() {
             bail!("cargo failed with error {:?}", status);
         }
+
+        let crank_manifest = load_manifest(&opt.manifest_path)?;
+
+        info!("manifest = {:#?}", crank_manifest);
 
         let overall_target_dir = project_path.join("target");
         let game_title = crank_manifest
@@ -817,7 +817,7 @@ struct Package {
 }
 
 impl Package {
-    pub fn execute(&self, opt: &Opt, crank_manifest: &Manifest) -> Result<(), Error> {
+    pub fn execute(&self, opt: &Opt) -> Result<(), Error> {
         if self.clean {
             info!("cleaning");
             let manifest_path_str;
@@ -840,7 +840,7 @@ impl Package {
             release: true,
             run: false,
         };
-        device_build.execute(opt, crank_manifest)?;
+        device_build.execute(opt)?;
 
         let sim_build = Build {
             device: false,
@@ -850,7 +850,7 @@ impl Package {
             run: false,
         };
 
-        let (target_dir, game_title) = sim_build.execute(opt, crank_manifest)?;
+        let (target_dir, game_title) = sim_build.execute(opt)?;
         let parent = target_dir.parent().expect("parent");
         let target_archive = parent.join(format!("{}.pdx.zip", game_title));
         info!("target_dir {:#?}", target_dir);
@@ -906,26 +906,17 @@ fn main() -> Result<(), Error> {
 
     match &opt.cmd {
         CrankCommand::Build(build) => {
-            let crank_manifest = load_manifest(&opt.manifest_path)?;
-
-            info!("manifest = {:#?}", crank_manifest);
-            build.execute(&opt, &crank_manifest)?;
+            build.execute(&opt)?;
         }
         CrankCommand::Run(build) => {
-            let crank_manifest = load_manifest(&opt.manifest_path)?;
-
-            info!("manifest = {:#?}", crank_manifest);
             let build_and_run = Build {
                 run: true,
                 ..build.clone()
             };
-            build_and_run.execute(&opt, &crank_manifest)?;
+            build_and_run.execute(&opt)?;
         }
         CrankCommand::Package(package) => {
-            let crank_manifest = load_manifest(&opt.manifest_path)?;
-
-            info!("manifest = {:#?}", crank_manifest);
-            package.execute(&opt, &crank_manifest)?;
+            package.execute(&opt)?;
         }
     }
 
