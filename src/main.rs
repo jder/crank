@@ -1,6 +1,7 @@
 use anyhow::{anyhow, bail, Error};
 use inflector::cases::titlecase::to_title_case;
 use log::{debug, info};
+use rayon::prelude::*;
 use serde_derive::Deserialize;
 use std::{
     collections::HashMap,
@@ -307,15 +308,25 @@ impl Build {
             ..
         }) = target
         {
-            for asset in assets {
-                let src_path = source_dir.join(asset);
-                let dst_path = dest_dir.join(asset);
-                info!("copy {:?} to {:?}", src_path, dst_path);
-                if let Some(dst_parent) = dst_path.parent() {
-                    fs::create_dir_all(&dst_parent)?;
-                }
-                fs::copy(&src_path, &dst_path)?;
-            }
+            assets
+                .par_iter()
+                .map(|asset| {
+                    let src_path = source_dir.join(asset);
+                    let dst_path = dest_dir.join(asset);
+                    info!(
+                        "copy {:?} to {:?} on thread {:?}",
+                        src_path,
+                        dst_path,
+                        rayon::current_thread_index()
+                    );
+
+                    if let Some(dst_parent) = dst_path.parent() {
+                        fs::create_dir_all(&dst_parent)?;
+                    }
+                    fs::copy(&src_path, &dst_path)?;
+                    Ok(())
+                })
+                .collect::<std::io::Result<()>>()?;
         }
         Ok(())
     }
@@ -389,19 +400,25 @@ impl Build {
     #[cfg(unix)]
     fn copy_directory(src: &Path, dst: &Path) -> Result<(), Error> {
         info!("copy_directory {:?} -> {:?}", src, dst);
-        for entry in fs::read_dir(src).context("Reading source game directory")? {
-            let entry = entry.context("bad entry")?;
-            let target_path = dst.join(entry.file_name());
-            if entry.path().is_dir() {
-                fs::create_dir_all(&target_path)
-                    .context(format!("Creating directory {:#?} on device", target_path))?;
-                Self::copy_directory(&entry.path(), &target_path)?;
-            } else {
-                info!("copy_file {:?} -> {:?}", entry.path(), target_path);
-                fs::copy(entry.path(), target_path).context("copy file")?;
-            }
-        }
-        Ok(())
+        fs::read_dir(src)
+            .context("Reading source game directory")?
+            .collect::<Vec<_>>()
+            .into_par_iter()
+            .try_for_each(|entry| {
+                {
+                    let entry = entry.context("bad entry")?;
+                    let target_path = dst.join(entry.file_name());
+                    if entry.path().is_dir() {
+                        fs::create_dir_all(&target_path)
+                            .context(format!("Creating directory {:#?} on device", target_path))?;
+                        Self::copy_directory(&entry.path(), &target_path)?;
+                    } else {
+                        info!("copy_file {:?} -> {:?}", entry.path(), target_path);
+                        fs::copy(entry.path(), target_path).context("copy file")?;
+                    }
+                }
+                Ok(())
+            })
     }
 
     #[cfg(windows)]
@@ -460,7 +477,7 @@ impl Build {
         let duration = time::Duration::from_millis(100);
         if modem_path.exists() {
             let mut cmd = Command::new(&pdutil_path);
-            cmd.arg(modem_path.clone()).arg("datadisk").arg(pdx_dir);
+            cmd.arg(modem_path.clone()).arg("datadisk");
             info!("datadisk cmd: {:#?}", cmd);
             let _ = cmd.status()?;
 
