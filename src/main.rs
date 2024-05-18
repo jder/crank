@@ -620,7 +620,10 @@ impl Build {
         };
 
         if !status.success() {
-            bail!("open failed with error {:?}", status);
+            bail!(
+                "running simulator failed -- try running pdx manually for more info. Error: {:?}",
+                status
+            );
         }
 
         Ok(())
