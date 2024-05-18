@@ -472,10 +472,10 @@ impl Build {
             env::var("USER").expect("user")
         )));
 
-        println!("Mounting Playdate; if it does not reboot into data disk mode try doing that manually in Settings -> System");
-
         let duration = time::Duration::from_millis(100);
         if modem_path.exists() {
+            println!("Mounting Playdate; if it does not reboot into data disk mode try doing that manually in Settings -> System");
+
             let mut cmd = Command::new(&pdutil_path);
             cmd.arg(modem_path.clone()).arg("datadisk");
             info!("datadisk cmd: {:#?}", cmd);
@@ -487,6 +487,8 @@ impl Build {
             while modem_path.exists() {
                 thread::sleep(duration);
             }
+        } else {
+            println!("No playdate detected, please connect & mount into data disk mode in Settings -> System");
         }
 
         #[cfg(target_os = "linux")]
