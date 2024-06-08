@@ -291,10 +291,14 @@ impl Build {
         example_title: &str,
     ) -> Result<PathBuf, Error> {
         info!("make_source_dir");
-        let pdx_path = overall_target_dir.join(example_title);
-        fs::create_dir_all(&pdx_path)?;
+        let source_path = overall_target_dir.join(example_title);
+        if source_path.exists() {
+            fs::remove_dir_all(&source_path).unwrap_or_else(|_err| ());
+        }
 
-        Ok(pdx_path)
+        fs::create_dir_all(&source_path)?;
+
+        Ok(source_path)
     }
 
     fn copy_assets(
