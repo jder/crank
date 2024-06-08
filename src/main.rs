@@ -711,6 +711,10 @@ impl Build {
             Default::default()
         };
 
+        if opt.verbose {
+            args.push("--verbose");
+        }
+
         let mut command = Command::new("cargo");
         command.args(args);
         command.envs(envs);
