@@ -1,13 +1,12 @@
 use anyhow::{anyhow, bail, Error};
 use inflector::cases::titlecase::to_title_case;
 use log::{debug, info};
-use rayon::prelude::*;
 use serde_derive::Deserialize;
 use std::{
     collections::HashMap,
-    env,
-    fs::{self},
+    env, fs,
     io::Write,
+    mem::forget,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     thread, time,
@@ -313,17 +312,10 @@ impl Build {
         }) = target
         {
             assets
-                .par_iter()
+                .iter()
                 .map(|asset| {
                     let src_path = source_dir.join(asset);
                     let dst_path = dest_dir.join(asset);
-                    info!(
-                        "copy {:?} to {:?} on thread {:?}",
-                        src_path,
-                        dst_path,
-                        rayon::current_thread_index()
-                    );
-
                     if let Some(dst_parent) = dst_path.parent() {
                         fs::create_dir_all(&dst_parent)?;
                     }
@@ -381,12 +373,17 @@ impl Build {
 
     fn run_pdc(&self, source_dir: &PathBuf, dest_dir: &PathBuf) -> Result<(), Error> {
         info!("run_pdc");
+
+        let temp_dir = tempfile::tempdir()?;
+        // pdc automatically makes a Foo.pdx if you pass it a directory that isn't a .pdx, so we do that ourselves
+        let target_path = temp_dir.path().join(dest_dir.file_name().unwrap());
+
         let pdc_path = playdate_sdk_path()?.join("bin").join(PDC_NAME);
         let mut cmd = Command::new(pdc_path);
         cmd.arg("--strip");
         //   cmd.arg("--verbose");
         cmd.arg(source_dir);
-        cmd.arg(dest_dir);
+        cmd.arg(&target_path);
 
         debug!("{:?}", cmd);
 
@@ -398,31 +395,41 @@ impl Build {
             bail!("pdc failed with error {:?}", status);
         }
 
+        let mut target_path_with_trailing_slash = target_path.as_os_str().to_owned();
+        target_path_with_trailing_slash.push("/");
+
+        // now rsync the temp dir to the dest dir, based on *content*
+        // (not modified time) -- we have to do this two step because
+        // pdc always creates new files. We also do not update timestamps
+        // for the same reason (since the temp ones will be newer).
+        let mut command = Command::new("/usr/bin/rsync");
+        command
+            .args(["-crv", "--del"])
+            .arg(target_path_with_trailing_slash) // trailing slash means "the contents of this dir" instead of "the dir itself"
+            .arg(dest_dir);
+        debug!("{:?}", command);
+        command.status().map(|_| ()).context("rsync failed")?;
+
+        forget(temp_dir); // don't delete the temp dir
+
         Ok(())
     }
 
     #[cfg(unix)]
     fn copy_directory(src: &Path, dst: &Path) -> Result<(), Error> {
         info!("copy_directory {:?} -> {:?}", src, dst);
-        fs::read_dir(src)
-            .context("Reading source game directory")?
-            .collect::<Vec<_>>()
-            .into_par_iter()
-            .try_for_each(|entry| {
-                {
-                    let entry = entry.context("bad entry")?;
-                    let target_path = dst.join(entry.file_name());
-                    if entry.path().is_dir() {
-                        fs::create_dir_all(&target_path)
-                            .context(format!("Creating directory {:#?} on device", target_path))?;
-                        Self::copy_directory(&entry.path(), &target_path)?;
-                    } else {
-                        info!("copy_file {:?} -> {:?}", entry.path(), target_path);
-                        fs::copy(entry.path(), target_path).context("copy file")?;
-                    }
-                }
-                Ok(())
-            })
+
+        let mut src_with_trailing_slash = src.as_os_str().to_owned();
+        src_with_trailing_slash.push("/");
+
+        // This one is based on modified time & size because it's faster for playdate copies
+        // We need a trailing slash because the dst is already the directory we want to create.
+        let mut command = Command::new("/usr/bin/rsync");
+        command
+            .args(["-urtv", "--del"])
+            .arg(src_with_trailing_slash)
+            .arg(dst);
+        command.status().map(|_| ()).context("rsync failed")
     }
 
     #[cfg(windows)]
@@ -513,6 +520,7 @@ impl Build {
         let game_device_dir = format!("{}.pdx", example_title);
         let games_target_dir = games_dir.join(&game_device_dir);
         fs::create_dir(&games_target_dir).ok();
+        println!("installing on device");
         Self::copy_directory(&pdx_dir, &games_target_dir)?;
 
         #[cfg(target_os = "macos")]
@@ -726,9 +734,6 @@ impl Build {
         let package_name = target_name.replace('-', "_");
         let source_path = self.make_source_dir(&overall_target_dir, &game_title)?;
         let dest_path = overall_target_dir.join(format!("{}.pdx", &game_title));
-        if dest_path.exists() {
-            fs::remove_dir_all(&dest_path).unwrap_or_else(|_err| ());
-        }
         let mut target_dir = project_path.join("target");
         let dir_name = if self.release { "release" } else { "debug" };
         if self.device {
