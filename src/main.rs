@@ -158,6 +158,10 @@ struct Build {
     #[structopt(long)]
     release: bool,
 
+    /// Disable default features.
+    #[structopt(long)]
+    no_default_features: bool,
+
     /// Enable build feature flags.
     #[structopt(long)]
     features: Vec<String>,
@@ -666,6 +670,10 @@ impl Build {
             args.push("--release");
         }
 
+        if self.no_default_features {
+            args.push("--no-default-features");
+        }
+
         let features;
         if !self.features.is_empty() {
             features = format!("--features={}", self.features.join(","));
@@ -825,6 +833,10 @@ struct Package {
     #[structopt(long)]
     example: Option<String>,
 
+    /// Disable default features.
+    #[structopt(long)]
+    no_default_features: bool,
+
     /// Enable build feature flags.
     #[structopt(long)]
     features: Vec<String>,
@@ -858,6 +870,7 @@ impl Package {
         let device_build = Build {
             device: true,
             example: self.example.clone(),
+            no_default_features: self.no_default_features,
             features: self.features.clone(),
             release: true,
             run: false,
@@ -867,6 +880,7 @@ impl Package {
         let sim_build = Build {
             device: false,
             example: self.example.clone(),
+            no_default_features: self.no_default_features,
             features: self.features.clone(),
             release: true,
             run: false,
