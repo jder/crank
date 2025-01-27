@@ -611,10 +611,10 @@ impl Build {
         #[cfg(target_os = "macos")]
         let status = {
             let mut cmd = Command::new("open");
-            cmd.arg("-a");
-            cmd.arg("Playdate Simulator");
+            cmd.arg("-W"); // wait for exit
+            cmd.args(["--env", "RUST_BACKTRACE=1"]);
+            cmd.args(["-a", "Playdate Simulator"]);
             cmd.arg(&pdx_path);
-            cmd.env("RUST_BACKTRACE", "1");
             cmd.status()?
         };
 
