@@ -687,6 +687,7 @@ impl Build {
             args.push("--target");
             args.push("thumbv7em-none-eabihf");
 
+            // We currently assume nightly, but build-std should be available on stable soon.
             args.push("-Zbuild-std=core,alloc");
         }
 
