@@ -430,7 +430,7 @@ impl Build {
         // We need a trailing slash because the dst is already the directory we want to create.
         let mut command = Command::new("/usr/bin/rsync");
         command
-            .args(["-urtv", "--del"])
+            .args(["-urtv", "--del", "--exclude", ".*"])
             .arg(src_with_trailing_slash)
             .arg(dst);
         command.status().map(|_| ()).context("rsync failed")
