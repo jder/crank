@@ -668,6 +668,10 @@ impl Build {
                 bail!("Could not find compatible target");
             }
         };
+        let package_name = target_name.replace('-', "_");
+
+        args.push("--package");
+        args.push(&package_name);
 
         if self.release {
             args.push("--release");
@@ -732,7 +736,6 @@ impl Build {
             .and_then(|target| target.metadata.as_ref())
             .and_then(|metadata| metadata.name.clone())
             .unwrap_or(to_title_case(&target_name));
-        let package_name = target_name.replace('-', "_");
         let source_path = self.make_source_dir(&overall_target_dir, &game_title)?;
         let dest_path = overall_target_dir.join(format!("{}.pdx", &game_title));
         let mut target_dir = project_path.join("target");
